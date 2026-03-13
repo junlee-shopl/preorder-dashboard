@@ -57,6 +57,20 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .pill.distributor.active { background: #ede9fe; color: var(--purple); }
 .pill.period.active { background: var(--light-blue); color: var(--primary); }
 .divider-v { width: 1px; height: 20px; background: var(--border); }
+
+/* Distributor multi-select dropdown */
+.dropdown-multi { position: relative; }
+.dropdown-trigger { padding: 4px 12px; border-radius: 20px; font-size: 11px; border: 1px solid var(--border); background: #fff; color: var(--text-sec); cursor: pointer; font-weight: 500; white-space: nowrap; min-width: 130px; text-align: left; }
+.dropdown-trigger::after { content: ' \25BE'; font-size: 10px; }
+.dropdown-trigger.has-selection { background: #ede9fe; color: #7c3aed; border-color: transparent; font-weight: 600; }
+.dropdown-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; background: #fff; border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 100; min-width: 220px; max-height: 320px; overflow-y: auto; padding: 4px 0; }
+.dropdown-menu.open { display: block; }
+.dropdown-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 12px; color: var(--text); cursor: pointer; white-space: nowrap; }
+.dropdown-item:hover { background: var(--bg); }
+.dropdown-item .check { width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; flex-shrink: 0; }
+.dropdown-item.selected .check { background: #7c3aed; border-color: #7c3aed; }
+.dropdown-item.selected .check::after { content: '\2713'; }
+.dropdown-sep { height: 1px; background: var(--border); margin: 4px 0; }
 .toggle-group { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
 .toggle-btn { padding: 4px 12px; font-size: 11px; border: none; background: #fff; color: var(--text-sec); cursor: pointer; font-weight: 500; }
 .toggle-btn.active { background: var(--primary); color: #fff; }
@@ -178,7 +192,13 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 <div class="filter-row" id="filterRow">
   <div class="filter-group" id="productPills"><span class="label">Product</span></div>
   <div class="divider-v"></div>
-  <div class="filter-group" id="distPills"><span class="label">Distributor</span></div>
+  <div class="filter-group" id="distFilter">
+    <span class="label">Distributor</span>
+    <div class="dropdown-multi" id="distDropdown">
+      <button class="dropdown-trigger" id="distTrigger">All Distributors</button>
+      <div class="dropdown-menu" id="distMenu"></div>
+    </div>
+  </div>
   <div class="divider-v"></div>
   <div class="filter-group" id="periodPills">
     <span class="label">Period</span>
@@ -482,6 +502,19 @@ function setupFilterToggles() {
   setupToggle('pickupChartModeToggle', v => { pickupChartMode = v; renderPickupChart(); });
   setupToggle('compareMetricToggle', v => { compareMetric = v; renderCompare(); });
 
+  // Distributor dropdown toggle
+  const distTrigger = document.getElementById('distTrigger');
+  const distMenu = document.getElementById('distMenu');
+  distTrigger.addEventListener('click', e => {
+    e.stopPropagation();
+    distMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', e => {
+    if (!document.getElementById('distDropdown').contains(e.target)) {
+      distMenu.classList.remove('open');
+    }
+  });
+
   // Hourly date select
   document.getElementById('hourlyDateSelect').addEventListener('change', e => {
     filters.selectedDay = e.target.value;
@@ -520,19 +553,53 @@ function renderPills() {
     pp.appendChild(p);
   });
 
-  // Distributor pills
-  const dp = document.getElementById('distPills');
-  dp.innerHTML = '<span class="label">Distributor</span>';
-  const allD = mkPill('All', 'distributor', filters.distributors.includes('all'));
-  allD.addEventListener('click', () => { filters.distributors = ['all']; renderPills(); renderAll(); });
-  dp.appendChild(allD);
+  // Distributor dropdown
+  renderDistDropdown();
+}
+
+function renderDistDropdown() {
+  const menu = document.getElementById('distMenu');
+  const trigger = document.getElementById('distTrigger');
+  const isAll = filters.distributors.includes('all');
+
+  // Update trigger text
+  if (isAll) {
+    trigger.textContent = 'All Distributors';
+    trigger.classList.remove('has-selection');
+  } else {
+    const count = filters.distributors.length;
+    trigger.textContent = count === 1 ? filters.distributors[0] : count + ' selected';
+    trigger.classList.add('has-selection');
+  }
+
+  // Build menu items
+  menu.innerHTML = '';
+  // "All" option
+  const allItem = document.createElement('div');
+  allItem.className = 'dropdown-item' + (isAll ? ' selected' : '');
+  allItem.innerHTML = '<span class="check"></span>All Distributors';
+  allItem.addEventListener('click', e => {
+    e.stopPropagation();
+    filters.distributors = ['all'];
+    renderDistDropdown(); renderAll();
+  });
+  menu.appendChild(allItem);
+
+  const sep = document.createElement('div');
+  sep.className = 'dropdown-sep';
+  menu.appendChild(sep);
+
   distributors.forEach(d => {
-    const p = mkPill(d, 'distributor', filters.distributors.includes(d));
-    p.addEventListener('click', () => {
+    const item = document.createElement('div');
+    const sel = filters.distributors.includes(d);
+    item.className = 'dropdown-item' + (sel ? ' selected' : '');
+    item.innerHTML = '<span class="check"></span>' + d;
+    item.addEventListener('click', e => {
+      e.stopPropagation();
       togglePillSelection(filters, 'distributors', d, distributors);
-      renderPills(); renderAll();
+      renderDistDropdown(); renderAll();
     });
-    dp.appendChild(p);
+    menu.appendChild(item);
   });
 }
 
