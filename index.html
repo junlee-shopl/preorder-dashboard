@@ -133,7 +133,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .empty-state .icon { font-size: 40px; }
 .empty-state .msg { font-size: 14px; }
 .empty-state .btn-go { padding: 8px 18px; background: var(--primary); color: #fff; border: none; border-radius: 5px; font-size: 13px; cursor: pointer; margin-top: 8px; }
-.empty-state .btn-go:hover { background: #1020880; }
+.empty-state .btn-go:hover { background: #102088; }
 
 /* === TOAST === */
 .toast { position: fixed; top: 60px; right: 20px; background: var(--dark-navy); color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 13px; z-index: 999; opacity: 0; transform: translateY(-10px); transition: all 0.3s; pointer-events: none; }
@@ -378,12 +378,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }).catch(() => { loadFromStorage(); renderAll(); });
 });
 
+function expandRecords(recs) {
+  if (!recs || !recs.length) return recs || [];
+  if (Array.isArray(recs[0])) {
+    return recs.map(r => ({ date:r[0], time:r[1], batch:r[2], productGroup:r[3], price:r[4], distributor:r[5], status:r[6], pickupDate:r[7]||'', pickupTime:r[8]||'' }));
+  }
+  return recs;
+}
+
 function loadFromStorage() {
   try {
     const cc = localStorage.getItem('currentCampaign');
-    if (cc) currentCampaign = JSON.parse(cc);
+    if (cc) {
+      currentCampaign = JSON.parse(cc);
+      if (currentCampaign.records) currentCampaign.records = expandRecords(currentCampaign.records);
+    }
     const pc = localStorage.getItem('pastCampaigns');
-    if (pc) pastCampaigns = JSON.parse(pc);
+    if (pc) {
+      pastCampaigns = JSON.parse(pc);
+      pastCampaigns.forEach(c => { c.records = expandRecords(c.records); });
+    }
   } catch(e) { console.error('Storage load error', e); }
   if (currentCampaign && currentCampaign.records) {
     const distSet = new Set();
@@ -394,9 +408,20 @@ function loadFromStorage() {
 
 function saveToStorage() {
   try {
-    if (currentCampaign) localStorage.setItem('currentCampaign', JSON.stringify(currentCampaign));
-    else localStorage.removeItem('currentCampaign');
-    localStorage.setItem('pastCampaigns', JSON.stringify(pastCampaigns));
+    if (currentCampaign) {
+      // Save lightweight version to avoid localStorage 5MB limit
+      const lite = {
+        name: currentCampaign.name, period: currentCampaign.period,
+        uploadedAt: currentCampaign.uploadedAt, files: currentCampaign.files,
+        records: currentCampaign.records.map(r => [r.date,r.time,r.batch,r.productGroup,r.price,r.distributor,r.status,r.pickupDate||'',r.pickupTime||''])
+      };
+      localStorage.setItem('currentCampaign', JSON.stringify(lite));
+    } else {
+      localStorage.removeItem('currentCampaign');
+    }
+    localStorage.setItem('pastCampaigns', JSON.stringify(pastCampaigns.map(c => ({
+      ...c, records: c.records.map(r => [r.date,r.time,r.batch,r.productGroup,r.price,r.distributor,r.status,r.pickupDate||'',r.pickupTime||''])
+    }))));
   } catch(e) {
     showToast('Storage limit reached — try clearing old data');
     console.error(e);
@@ -871,7 +896,7 @@ function renderPreorderChart() {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.parsed.y) } },
+        tooltip: { callbacks: { label: tip => tip.dataset.label + ': ' + (filters.metric === 'amount' ? fmtIDR(tip.parsed.y) : fmtNum(tip.parsed.y)) } },
       },
       scales: {
         x: { stacked: preorderChartMode === 'stacked', grid: { display: false }, ticks: { font: { size: 10 } } },
@@ -906,7 +931,7 @@ function renderHourlyChart(filtered, selProds) {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.parsed.y) } },
+        tooltip: { callbacks: { label: tip => tip.dataset.label + ': ' + (filters.metric === 'amount' ? fmtIDR(tip.parsed.y) : fmtNum(tip.parsed.y)) } },
       },
       scales: {
         x: { stacked: preorderChartMode === 'stacked', grid: { display: false }, ticks: { font: { size: 9 } } },
@@ -994,7 +1019,7 @@ function renderPickupChart() {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.parsed.y) } },
+        tooltip: { callbacks: { label: tip => tip.dataset.label + ': ' + (filters.metric === 'amount' ? fmtIDR(tip.parsed.y) : fmtNum(tip.parsed.y)) } },
       },
       scales: {
         x: { stacked: pickupChartMode === 'stacked', grid: { display: false }, ticks: { font: { size: 10 } } },
