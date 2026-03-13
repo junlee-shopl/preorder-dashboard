@@ -361,11 +361,21 @@ let pickupChartMode = 'stacked';
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-  loadFromStorage();
   setupTabs();
   setupFilterToggles();
   setupUpload();
-  renderAll();
+  // Load embedded data.json first, then fallback to localStorage
+  fetch('data.json').then(r => r.ok ? r.json() : null).then(data => {
+    if (data && data.records && data.records.length) {
+      currentCampaign = { name: data.name, period: data.period, uploadedAt: data.updatedAt, files: [], records: data.records };
+      const distSet = new Set();
+      data.records.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
+      distributors = [...distSet].sort();
+    } else {
+      loadFromStorage();
+    }
+    renderAll();
+  }).catch(() => { loadFromStorage(); renderAll(); });
 });
 
 function loadFromStorage() {
