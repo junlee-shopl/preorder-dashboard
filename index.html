@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Samsung Pre-order Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary: #1428A0;
+  --dark-navy: #1c2951;
+  --light-blue: #e8ecff;
+  --green: #10b981;
+  --cyan: #0ea5e9;
+  --purple: #7c3aed;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --bg: #f0f2f7;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --border-light: #f3f4f6;
+  --text: #111111;
+  --text-sec: #6b7280;
+  --text-muted: #9ca3af;
+  --radius: 8px;
+}
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+/* === TOPNAV === */
+.topnav { height: 46px; background: var(--dark-navy); display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0; }
+.topnav .logo { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+.topnav .separator { color: #4a5578; font-size: 18px; }
+.topnav .campaign-name { color: #a0aec0; font-size: 13px; }
+.topnav .live-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.topnav .spacer { flex: 1; }
+.topnav .btn-nav { background: rgba(255,255,255,0.1); color: #fff; border: none; padding: 6px 14px; border-radius: 5px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+.topnav .btn-nav:hover { background: rgba(255,255,255,0.2); }
+
+/* === TABS === */
+.tabs { height: 38px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 0; flex-shrink: 0; }
+.tab-btn { background: none; border: none; padding: 8px 18px; font-size: 13px; color: var(--text-sec); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+/* === FILTER ROW === */
+.filter-row { min-height: 40px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 6px 20px; gap: 16px; flex-shrink: 0; flex-wrap: wrap; }
+.filter-row.hidden { display: none; }
+.filter-group { display: flex; align-items: center; gap: 4px; }
+.filter-group .label { font-size: 11px; color: var(--text-muted); margin-right: 4px; font-weight: 600; text-transform: uppercase; }
+.pill { padding: 4px 12px; border-radius: 20px; font-size: 11px; border: 1px solid var(--border); background: #fff; color: var(--text-sec); cursor: pointer; font-weight: 500; white-space: nowrap; transition: all 0.15s; }
+.pill:hover { border-color: #c0c4cc; }
+.pill.active { border-color: transparent; font-weight: 600; }
+.pill.product.active { background: #dce3ff; color: var(--primary); }
+.pill.distributor.active { background: #ede9fe; color: var(--purple); }
+.pill.period.active { background: var(--light-blue); color: var(--primary); }
+.divider-v { width: 1px; height: 20px; background: var(--border); }
+.toggle-group { display: flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.toggle-btn { padding: 4px 12px; font-size: 11px; border: none; background: #fff; color: var(--text-sec); cursor: pointer; font-weight: 500; }
+.toggle-btn.active { background: var(--primary); color: #fff; }
+
+/* === SCREEN CONTENT === */
+.screen { flex: 1; display: none; flex-direction: column; padding: 16px 20px; gap: 14px; overflow: hidden; }
+.screen.active { display: flex; }
+
+/* === KPI STRIP === */
+.kpi-strip { display: grid; gap: 12px; flex-shrink: 0; }
+.kpi-strip.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.kpi-strip.cols-5 { grid-template-columns: repeat(5, 1fr); }
+.kpi-card { background: var(--card); border-radius: var(--radius); padding: 14px 16px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+.kpi-card .bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.kpi-card .kpi-label { font-size: 11px; color: var(--text-sec); font-weight: 600; margin-bottom: 4px; text-transform: uppercase; }
+.kpi-card .kpi-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
+.kpi-card .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* === CHART CARD === */
+.chart-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.chart-header { display: flex; align-items: center; padding: 10px 16px; gap: 10px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+.chart-header .chart-title { font-size: 13px; font-weight: 600; }
+.chart-header .spacer { flex: 1; }
+.chart-body { flex: 1; padding: 10px 16px 14px; min-height: 0; position: relative; }
+.chart-body canvas { width: 100% !important; height: 100% !important; }
+
+/* Hourly date select */
+.date-select { padding: 3px 8px; font-size: 11px; border: 1px solid var(--border); border-radius: 4px; background: #fff; }
+.date-select.hidden { display: none; }
+
+/* === UPLOAD TAB === */
+.upload-screen { display: none; flex-direction: row; gap: 20px; padding: 20px; flex: 1; overflow: auto; }
+.upload-screen.active { display: flex; }
+.upload-panel { flex: 1; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; }
+.upload-panel h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.upload-panel .subtitle { font-size: 12px; color: var(--text-sec); margin-bottom: 16px; }
+.drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 36px 20px; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--primary); background: #f5f7ff; }
+.drop-zone .icon { font-size: 32px; color: var(--text-muted); margin-bottom: 8px; }
+.drop-zone .text { font-size: 13px; color: var(--text-sec); }
+.drop-zone .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.upload-history { flex: 1; overflow: auto; }
+.upload-history h4 { font-size: 12px; color: var(--text-sec); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; }
+.history-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 5px; font-size: 12px; color: var(--text-sec); }
+.history-item:hover { background: var(--bg); }
+.history-item .icon { color: var(--primary); }
+.history-item .name { flex: 1; }
+.history-item .date { color: var(--text-muted); font-size: 11px; }
+.past-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.past-form label { font-size: 12px; font-weight: 600; color: var(--text-sec); }
+.past-form input, .past-form select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; }
+.saved-campaign { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 5px; font-size: 12px; color: var(--text-sec); }
+.saved-campaign:hover { background: var(--bg); }
+.saved-campaign .info { flex: 1; }
+.saved-campaign .info .name { font-weight: 600; color: var(--text); }
+.saved-campaign .info .count { color: var(--text-muted); font-size: 11px; }
+.saved-campaign .btn-del { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 3px; }
+.saved-campaign .btn-del:hover { color: var(--red); background: #fee2e2; }
+.btn-clear { background: none; border: 1px solid var(--red); color: var(--red); padding: 6px 14px; border-radius: 5px; font-size: 12px; cursor: pointer; margin-top: 12px; align-self: flex-start; }
+.btn-clear:hover { background: #fef2f2; }
+
+/* === COMPARE TAB === */
+.compare-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap; }
+.compare-header h2 { font-size: 16px; font-weight: 700; }
+.compare-header .spacer { flex: 1; }
+.compare-header select { padding: 5px 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 12px; }
+.compare-header .vs { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.compare-sub { font-size: 12px; color: var(--text-muted); margin-top: -8px; }
+.compare-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
+.compare-charts .chart-card { min-height: 200px; }
+
+/* === EMPTY STATE === */
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); gap: 8px; }
+.empty-state .icon { font-size: 40px; }
+.empty-state .msg { font-size: 14px; }
+.empty-state .btn-go { padding: 8px 18px; background: var(--primary); color: #fff; border: none; border-radius: 5px; font-size: 13px; cursor: pointer; margin-top: 8px; }
+.empty-state .btn-go:hover { background: #1020880; }
+
+/* === TOAST === */
+.toast { position: fixed; top: 60px; right: 20px; background: var(--dark-navy); color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 13px; z-index: 999; opacity: 0; transform: translateY(-10px); transition: all 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* === Delta badges === */
+.delta { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 3px; }
+.delta.up { color: var(--green); background: #ecfdf5; }
+.delta.down { color: var(--red); background: #fef2f2; }
+
+/* Rate by product mini table */
+.rate-table { font-size: 11px; margin-top: 4px; }
+.rate-table td { padding: 1px 6px 1px 0; }
+.rate-table .rprod { color: var(--text-sec); }
+.rate-table .rval { font-weight: 600; }
+
+/* Product compare cards */
+.product-compare-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- TOPNAV -->
+<div class="topnav">
+  <span class="logo">SAMSUNG</span>
+  <span class="separator">|</span>
+  <span class="campaign-name" id="navCampaignName">Pre-order Dashboard</span>
+  <span class="live-dot" id="liveDot" style="display:none;"></span>
+  <span class="spacer"></span>
+  <button class="btn-nav" id="btnExport" onclick="exportCSV()">&#x2B73; Export CSV</button>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="preorder">Pre-order</button>
+  <button class="tab-btn" data-tab="pickup">Pick-up</button>
+  <button class="tab-btn" data-tab="compare">Compare</button>
+  <button class="tab-btn" data-tab="upload">Upload</button>
+</div>
+
+<!-- FILTER ROW -->
+<div class="filter-row" id="filterRow">
+  <div class="filter-group" id="productPills"><span class="label">Product</span></div>
+  <div class="divider-v"></div>
+  <div class="filter-group" id="distPills"><span class="label">Distributor</span></div>
+  <div class="divider-v"></div>
+  <div class="filter-group" id="periodPills">
+    <span class="label">Period</span>
+    <button class="pill period active" data-period="all">All</button>
+    <button class="pill period" data-period="batch1">Batch 1</button>
+    <button class="pill period" data-period="batch2">Batch 2</button>
+  </div>
+  <div class="divider-v"></div>
+  <div class="toggle-group" id="granularityToggle">
+    <button class="toggle-btn active" data-val="daily">Daily</button>
+    <button class="toggle-btn" data-val="hourly">Hourly</button>
+  </div>
+  <div class="toggle-group" id="metricToggle">
+    <button class="toggle-btn active" data-val="qty">Units</button>
+    <button class="toggle-btn" data-val="amount">Amount</button>
+  </div>
+  <div class="toggle-group" id="accumToggle">
+    <button class="toggle-btn active" data-val="daily">Daily</button>
+    <button class="toggle-btn" data-val="cumulative">Cumulative</button>
+  </div>
+</div>
+
+<!-- SCREEN: Pre-order -->
+<div class="screen active" id="screen-preorder">
+  <div class="kpi-strip cols-4" id="preorderKPI" style="display:none;"></div>
+  <div class="chart-card" id="preorderChartCard" style="display:none;">
+    <div class="chart-header">
+      <span class="chart-title">Pre-order Trend</span>
+      <span class="spacer"></span>
+      <select class="date-select hidden" id="hourlyDateSelect"></select>
+      <div class="toggle-group" id="chartModeToggle">
+        <button class="toggle-btn active" data-val="stacked">Stacked</button>
+        <button class="toggle-btn" data-val="grouped">Grouped</button>
+      </div>
+    </div>
+    <div class="chart-body"><canvas id="preorderChart"></canvas></div>
+  </div>
+  <div class="empty-state" id="emptyPreorder">
+    <div class="icon">&#x1F4CA;</div>
+    <div class="msg">Upload data to get started</div>
+    <button class="btn-go" onclick="switchTab('upload')">Go to Upload</button>
+  </div>
+</div>
+
+<!-- SCREEN: Pick-up -->
+<div class="screen" id="screen-pickup">
+  <div class="kpi-strip cols-5" id="pickupKPI" style="display:none;"></div>
+  <div class="chart-card" id="pickupChartCard" style="display:none;">
+    <div class="chart-header">
+      <span class="chart-title">Daily Pick-ups</span>
+      <span class="spacer"></span>
+      <div class="toggle-group" id="pickupChartModeToggle">
+        <button class="toggle-btn active" data-val="stacked">Stacked</button>
+        <button class="toggle-btn" data-val="grouped">Grouped</button>
+      </div>
+    </div>
+    <div class="chart-body"><canvas id="pickupChart"></canvas></div>
+  </div>
+  <div class="empty-state" id="emptyPickup">
+    <div class="icon">&#x1F4CA;</div>
+    <div class="msg">Upload data to get started</div>
+    <button class="btn-go" onclick="switchTab('upload')">Go to Upload</button>
+  </div>
+</div>
+
+<!-- SCREEN: Compare -->
+<div class="screen" id="screen-compare">
+  <div class="compare-header">
+    <h2>Campaign Comparison</h2>
+    <span class="spacer"></span>
+    <select id="compareA"></select>
+    <span class="vs">vs.</span>
+    <select id="compareB"></select>
+    <div class="toggle-group" id="compareMetricToggle">
+      <button class="toggle-btn active" data-val="qty">Units</button>
+      <button class="toggle-btn" data-val="amount">Amount</button>
+    </div>
+  </div>
+  <div class="compare-sub">Same-day comparison based on campaign start date</div>
+  <div class="kpi-strip cols-5" id="compareKPI"></div>
+  <div class="compare-charts">
+    <div class="chart-card">
+      <div class="chart-header"><span class="chart-title">Daily Pre-order Trend</span></div>
+      <div class="chart-body"><canvas id="compareDailyChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><span class="chart-title">Cumulative Pre-orders</span></div>
+      <div class="chart-body"><canvas id="compareCumChart"></canvas></div>
+    </div>
+  </div>
+  <div class="product-compare-strip" id="productCompareStrip"></div>
+  <div class="empty-state" id="emptyCompare" style="display:none;">
+    <div class="icon">&#x1F4CA;</div>
+    <div class="msg">No campaign data yet &mdash; upload via the Upload tab</div>
+    <button class="btn-go" onclick="switchTab('upload')">Go to Upload</button>
+  </div>
+</div>
+
+<!-- SCREEN: Upload -->
+<div class="upload-screen" id="screen-upload">
+  <!-- Left: Current Campaign -->
+  <div class="upload-panel">
+    <h3>Current Campaign</h3>
+    <div class="subtitle" id="currentCampaignInfo">Galaxy S26 Series &middot; 2026</div>
+    <div class="drop-zone" id="dropCurrent">
+      <div class="icon">&#x1F4C4;</div>
+      <div class="text">Drop Excel file here</div>
+      <div class="hint">or click to browse &middot; .xlsx only</div>
+    </div>
+    <input type="file" id="fileInputCurrent" accept=".xlsx" style="display:none">
+    <div class="upload-history" id="uploadHistory">
+      <h4>Upload History</h4>
+    </div>
+    <button class="btn-clear" onclick="clearCurrentData()">Clear All Data</button>
+  </div>
+  <!-- Right: Past Campaign -->
+  <div class="upload-panel">
+    <h3>Past Campaign (for Comparison)</h3>
+    <div class="subtitle">Upload previous campaign data for comparison</div>
+    <div class="past-form">
+      <label>Campaign Name</label>
+      <input type="text" id="pastName" placeholder="e.g. S25 Series">
+      <label>Year</label>
+      <select id="pastYear">
+        <option>2025</option><option>2024</option><option>2023</option>
+      </select>
+    </div>
+    <div class="drop-zone" id="dropPast">
+      <div class="icon">&#x1F4C4;</div>
+      <div class="text">Drop Excel file here</div>
+      <div class="hint">or click to browse &middot; .xlsx only</div>
+    </div>
+    <input type="file" id="fileInputPast" accept=".xlsx" style="display:none">
+    <div class="upload-history" id="savedCampaigns">
+      <h4>Saved Campaigns</h4>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const PRODUCT_GROUPS = ['Galaxy S26 Ultra','Galaxy S26 Plus','Galaxy S26','Galaxy Buds4 Pro','Galaxy Buds4'];
+const PRODUCT_COLORS = {
+  'Galaxy S26 Ultra': { main:'#1428A0', bg:'#dce3ff' },
+  'Galaxy S26 Plus':  { main:'#3b5bd9', bg:'#dce3ff' },
+  'Galaxy S26':       { main:'#6b83e8', bg:'#e6eaff' },
+  'Galaxy Buds4 Pro': { main:'#0284c7', bg:'#e0f2fe' },
+  'Galaxy Buds4':     { main:'#0ea5e9', bg:'#e0f2fe' },
+};
+const DIST_COLOR = { main:'#7c3aed', bg:'#ede9fe' };
+
+let currentCampaign = null; // { name, period, uploadedAt, files, records }
+let pastCampaigns = [];     // [{ id, name, year, uploadedAt, records }]
+let distributors = [];
+
+const filters = {
+  products: ['all'],
+  distributors: ['all'],
+  period: 'all',
+  granularity: 'daily',
+  metric: 'qty',
+  accumulation: 'daily',
+  selectedDay: null,
+};
+
+let preorderChart = null;
+let pickupChart = null;
+let compareDailyChart = null;
+let compareCumChart = null;
+let compareMetric = 'qty';
+let preorderChartMode = 'stacked';
+let pickupChartMode = 'stacked';
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  loadFromStorage();
+  setupTabs();
+  setupFilterToggles();
+  setupUpload();
+  renderAll();
+});
+
+function loadFromStorage() {
+  try {
+    const cc = localStorage.getItem('currentCampaign');
+    if (cc) currentCampaign = JSON.parse(cc);
+    const pc = localStorage.getItem('pastCampaigns');
+    if (pc) pastCampaigns = JSON.parse(pc);
+  } catch(e) { console.error('Storage load error', e); }
+  if (currentCampaign && currentCampaign.records) {
+    const distSet = new Set();
+    currentCampaign.records.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
+    distributors = [...distSet].sort();
+  }
+}
+
+function saveToStorage() {
+  try {
+    if (currentCampaign) localStorage.setItem('currentCampaign', JSON.stringify(currentCampaign));
+    else localStorage.removeItem('currentCampaign');
+    localStorage.setItem('pastCampaigns', JSON.stringify(pastCampaigns));
+  } catch(e) {
+    showToast('Storage limit reached — try clearing old data');
+    console.error(e);
+  }
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function setupTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.screen, .upload-screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + tab);
+  if (el) el.classList.add('active');
+
+  const fr = document.getElementById('filterRow');
+  fr.classList.toggle('hidden', tab === 'compare' || tab === 'upload');
+
+  if (tab === 'preorder' || tab === 'pickup') renderAll();
+  if (tab === 'compare') renderCompare();
+  if (tab === 'upload') renderUploadHistory();
+}
+
+// ============================================================
+// FILTER TOGGLES
+// ============================================================
+function setupFilterToggles() {
+  // Period pills
+  document.querySelectorAll('#periodPills .pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('#periodPills .pill').forEach(x => x.classList.remove('active'));
+      p.classList.add('active');
+      filters.period = p.dataset.period;
+      renderAll();
+    });
+  });
+
+  // Toggle groups
+  setupToggle('granularityToggle', v => {
+    filters.granularity = v;
+    const ds = document.getElementById('hourlyDateSelect');
+    ds.classList.toggle('hidden', v !== 'hourly');
+    if (v === 'hourly' && !filters.selectedDay) {
+      const dates = getUniqueDates();
+      if (dates.length) { filters.selectedDay = dates[0]; ds.value = dates[0]; }
+    }
+    renderAll();
+  });
+  setupToggle('metricToggle', v => { filters.metric = v; renderAll(); });
+  setupToggle('accumToggle', v => { filters.accumulation = v; renderAll(); });
+  setupToggle('chartModeToggle', v => { preorderChartMode = v; renderPreorderChart(); });
+  setupToggle('pickupChartModeToggle', v => { pickupChartMode = v; renderPickupChart(); });
+  setupToggle('compareMetricToggle', v => { compareMetric = v; renderCompare(); });
+
+  // Hourly date select
+  document.getElementById('hourlyDateSelect').addEventListener('change', e => {
+    filters.selectedDay = e.target.value;
+    renderPreorderChart();
+  });
+}
+
+function setupToggle(id, cb) {
+  const grp = document.getElementById(id);
+  if (!grp) return;
+  grp.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      grp.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      cb(btn.dataset.val);
+    });
+  });
+}
+
+// ============================================================
+// PILL RENDERING
+// ============================================================
+function renderPills() {
+  // Product pills
+  const pp = document.getElementById('productPills');
+  pp.innerHTML = '<span class="label">Product</span>';
+  const allP = mkPill('All', 'product', filters.products.includes('all'));
+  allP.addEventListener('click', () => { filters.products = ['all']; renderPills(); renderAll(); });
+  pp.appendChild(allP);
+  PRODUCT_GROUPS.forEach(pg => {
+    const p = mkPill(pg.replace('Galaxy ', ''), 'product', filters.products.includes(pg));
+    p.addEventListener('click', () => {
+      togglePillSelection(filters, 'products', pg, PRODUCT_GROUPS);
+      renderPills(); renderAll();
+    });
+    pp.appendChild(p);
+  });
+
+  // Distributor pills
+  const dp = document.getElementById('distPills');
+  dp.innerHTML = '<span class="label">Distributor</span>';
+  const allD = mkPill('All', 'distributor', filters.distributors.includes('all'));
+  allD.addEventListener('click', () => { filters.distributors = ['all']; renderPills(); renderAll(); });
+  dp.appendChild(allD);
+  distributors.forEach(d => {
+    const p = mkPill(d, 'distributor', filters.distributors.includes(d));
+    p.addEventListener('click', () => {
+      togglePillSelection(filters, 'distributors', d, distributors);
+      renderPills(); renderAll();
+    });
+    dp.appendChild(p);
+  });
+}
+
+function mkPill(text, cls, active) {
+  const b = document.createElement('button');
+  b.className = 'pill ' + cls + (active ? ' active' : '');
+  b.textContent = text;
+  return b;
+}
+
+function togglePillSelection(filters, key, val, allVals) {
+  const arr = filters[key];
+  if (arr.includes('all')) {
+    filters[key] = [val];
+  } else if (arr.includes(val)) {
+    filters[key] = arr.filter(v => v !== val);
+    if (filters[key].length === 0) filters[key] = ['all'];
+  } else {
+    filters[key] = [...arr, val];
+    if (filters[key].length === allVals.length) filters[key] = ['all'];
+  }
+}
+
+// ============================================================
+// EXCEL PARSING
+// ============================================================
+function parseExcel(workbook) {
+  const ws = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+  const campaignName = rows[0]?.[0] || '';
+  const period = rows[1]?.[1] || '';
+
+  const records = [];
+  for (let i = 7; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[0]) continue;
+    const priceStr = String(r[9] || '0').replace(/,/g, '');
+    records.push({
+      platform:     r[1]  || '',
+      orderCode:    r[2]  || '',
+      date:         r[3]  || '',
+      time:         r[4]  || '',
+      batch:        r[5]  || '',
+      productGroup: r[6]  || '',
+      productName:  r[7]  || '',
+      sku:          r[8]  || '',
+      price:        parseInt(priceStr) || 0,
+      storeName:    r[12] || '',
+      distributor:  r[13] || '',
+      province:     r[16] || '',
+      city:         r[17] || '',
+      status:       r[33] || '',
+      pickupDate:   r[34] || '',
+      pickupTime:   r[35] || '',
+    });
+  }
+  return { campaignName, period, records };
+}
+
+function makeLightRecords(records) {
+  return records.map(r => ({
+    date: r.date, time: r.time, batch: r.batch,
+    productGroup: r.productGroup, price: r.price,
+    distributor: r.distributor, status: r.status,
+    pickupDate: r.pickupDate, pickupTime: r.pickupTime,
+  }));
+}
+
+// ============================================================
+// UPLOAD HANDLING
+// ============================================================
+function setupUpload() {
+  // Current campaign
+  const dzC = document.getElementById('dropCurrent');
+  const fiC = document.getElementById('fileInputCurrent');
+  dzC.addEventListener('click', () => fiC.click());
+  dzC.addEventListener('dragover', e => { e.preventDefault(); dzC.classList.add('dragover'); });
+  dzC.addEventListener('dragleave', () => dzC.classList.remove('dragover'));
+  dzC.addEventListener('drop', e => { e.preventDefault(); dzC.classList.remove('dragover'); handleCurrentFile(e.dataTransfer.files[0]); });
+  fiC.addEventListener('change', e => { if (e.target.files[0]) handleCurrentFile(e.target.files[0]); });
+
+  // Past campaign
+  const dzP = document.getElementById('dropPast');
+  const fiP = document.getElementById('fileInputPast');
+  dzP.addEventListener('click', () => fiP.click());
+  dzP.addEventListener('dragover', e => { e.preventDefault(); dzP.classList.add('dragover'); });
+  dzP.addEventListener('dragleave', () => dzP.classList.remove('dragover'));
+  dzP.addEventListener('drop', e => { e.preventDefault(); dzP.classList.remove('dragover'); handlePastFile(e.dataTransfer.files[0]); });
+  fiP.addEventListener('change', e => { if (e.target.files[0]) handlePastFile(e.target.files[0]); });
+}
+
+function handleCurrentFile(file) {
+  if (!file || !file.name.endsWith('.xlsx')) { showToast('Please upload a .xlsx file'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const parsed = parseExcel(wb);
+      if (!parsed.records.length) { showToast('Could not parse file. Please upload a Shopl Pre-order export.'); return; }
+      const light = makeLightRecords(parsed.records);
+      const now = new Date().toISOString();
+      if (!currentCampaign) {
+        currentCampaign = { name: parsed.campaignName, period: parsed.period, uploadedAt: now, files: [], records: light };
+      }
+      currentCampaign.records = light;
+      currentCampaign.name = parsed.campaignName;
+      currentCampaign.period = parsed.period;
+      currentCampaign.uploadedAt = now;
+      if (!currentCampaign.files) currentCampaign.files = [];
+      currentCampaign.files.unshift({ name: file.name, date: now });
+      if (currentCampaign.files.length > 10) currentCampaign.files = currentCampaign.files.slice(0, 10);
+
+      // Update distributors
+      const distSet = new Set();
+      light.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
+      distributors = [...distSet].sort();
+
+      saveToStorage();
+      showToast('\u2713 ' + light.length.toLocaleString() + ' orders loaded');
+      renderPills();
+      renderAll();
+      renderUploadHistory();
+      updateNav();
+    } catch(err) {
+      showToast('Could not parse file. Please upload a Shopl Pre-order export.');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function handlePastFile(file) {
+  if (!file || !file.name.endsWith('.xlsx')) { showToast('Please upload a .xlsx file'); return; }
+  const name = document.getElementById('pastName').value.trim();
+  const year = document.getElementById('pastYear').value;
+  if (!name) { showToast('Please enter a campaign name'); return; }
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const parsed = parseExcel(wb);
+      if (!parsed.records.length) { showToast('Could not parse file.'); return; }
+      const light = makeLightRecords(parsed.records);
+      const id = name.replace(/\s+/g, '_') + '_' + year;
+      // Remove existing with same id
+      pastCampaigns = pastCampaigns.filter(c => c.id !== id);
+      pastCampaigns.unshift({ id, name, year, uploadedAt: new Date().toISOString(), records: light });
+      saveToStorage();
+      showToast('\u2713 ' + name + ' · ' + light.length.toLocaleString() + ' orders saved');
+      renderUploadHistory();
+      document.getElementById('pastName').value = '';
+    } catch(err) {
+      showToast('Could not parse file.');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function clearCurrentData() {
+  if (!confirm('Clear all current campaign data?')) return;
+  currentCampaign = null;
+  localStorage.removeItem('currentCampaign');
+  distributors = [];
+  renderPills();
+  renderAll();
+  renderUploadHistory();
+  updateNav();
+  showToast('Data cleared');
+}
+
+function renderUploadHistory() {
+  const hist = document.getElementById('uploadHistory');
+  let html = '<h4>Upload History</h4>';
+  if (currentCampaign && currentCampaign.files) {
+    currentCampaign.files.forEach(f => {
+      const d = new Date(f.date);
+      const isToday = new Date().toDateString() === d.toDateString();
+      const label = isToday ? 'Today ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : d.toLocaleDateString();
+      html += `<div class="history-item"><span class="icon">&#x1F4C4;</span><span class="name">${esc(f.name)}</span><span class="date">${label}</span></div>`;
+    });
+  }
+  hist.innerHTML = html;
+
+  // Saved past campaigns
+  const sc = document.getElementById('savedCampaigns');
+  let sh = '<h4>Saved Campaigns</h4>';
+  pastCampaigns.forEach(c => {
+    sh += `<div class="saved-campaign">
+      <span>&#x1F4CA;</span>
+      <div class="info"><div class="name">${esc(c.name)} &middot; ${esc(c.year)}</div><div class="count">${c.records.length.toLocaleString()} orders</div></div>
+      <button class="btn-del" onclick="deletePastCampaign('${esc(c.id)}')">&times;</button>
+    </div>`;
+  });
+  sc.innerHTML = sh;
+}
+
+function deletePastCampaign(id) {
+  pastCampaigns = pastCampaigns.filter(c => c.id !== id);
+  saveToStorage();
+  renderUploadHistory();
+  showToast('Campaign removed');
+}
+
+// ============================================================
+// FILTERING
+// ============================================================
+function getRecords() {
+  if (!currentCampaign || !currentCampaign.records) return [];
+  return currentCampaign.records;
+}
+
+function applyFilters(records) {
+  return records.filter(r => {
+    const productOk = filters.products.includes('all') || filters.products.includes(r.productGroup);
+    const distOk = filters.distributors.includes('all') || filters.distributors.includes(r.distributor);
+    const periodOk = filters.period === 'all' ||
+      (filters.period === 'batch1' && r.batch === 'Batch 1') ||
+      (filters.period === 'batch2' && r.batch === 'Batch 2');
+    return productOk && distOk && periodOk;
+  });
+}
+
+function getUniqueDates(recs) {
+  const records = recs || getRecords();
+  const s = new Set(records.map(r => r.date));
+  return [...s].sort();
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll() {
+  updateNav();
+  renderPills();
+  const hasData = currentCampaign && currentCampaign.records && currentCampaign.records.length > 0;
+
+  // Pre-order screen
+  const kpiP = document.getElementById('preorderKPI');
+  const emptyP = document.getElementById('emptyPreorder');
+  const preChartCard = document.getElementById('preorderChartCard');
+  if (!hasData) {
+    kpiP.style.display = 'none';
+    preChartCard.style.display = 'none';
+    emptyP.style.display = '';
+  } else {
+    kpiP.style.display = '';
+    preChartCard.style.display = '';
+    emptyP.style.display = 'none';
+    renderPreorderKPI();
+    renderPreorderChart();
+  }
+
+  // Pickup screen
+  const kpiPU = document.getElementById('pickupKPI');
+  const emptyPU = document.getElementById('emptyPickup');
+  const pickChartCard = document.getElementById('pickupChartCard');
+  if (!hasData) {
+    kpiPU.style.display = 'none';
+    pickChartCard.style.display = 'none';
+    emptyPU.style.display = '';
+  } else {
+    kpiPU.style.display = '';
+    pickChartCard.style.display = '';
+    emptyPU.style.display = 'none';
+    renderPickupKPI();
+    renderPickupChart();
+  }
+
+  // Update hourly date select
+  if (hasData) {
+    const ds = document.getElementById('hourlyDateSelect');
+    const dates = getUniqueDates();
+    ds.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
+    if (filters.selectedDay && dates.includes(filters.selectedDay)) ds.value = filters.selectedDay;
+    else if (dates.length) { filters.selectedDay = dates[0]; ds.value = dates[0]; }
+  }
+}
+
+function updateNav() {
+  const n = document.getElementById('navCampaignName');
+  const dot = document.getElementById('liveDot');
+  if (currentCampaign) {
+    n.textContent = currentCampaign.name || 'Pre-order Dashboard';
+    dot.style.display = '';
+  } else {
+    n.textContent = 'Pre-order Dashboard';
+    dot.style.display = 'none';
+  }
+}
+
+// ============================================================
+// PRE-ORDER KPI
+// ============================================================
+function renderPreorderKPI() {
+  const all = getRecords();
+  const filtered = applyFilters(all);
+  const totalQty = filtered.length;
+  const totalAmt = filtered.reduce((s, r) => s + r.price, 0);
+  const batch1 = filtered.filter(r => r.batch === 'Batch 1').length;
+  const batch2 = filtered.filter(r => r.batch === 'Batch 2').length;
+
+  const offlineTarget = 35000; // placeholder target
+  const pctTarget = totalQty > 0 ? ((totalQty / offlineTarget) * 100).toFixed(1) : '0';
+  const amtTarget = ((totalAmt / (offlineTarget * 20000000)) * 100).toFixed(1);
+
+  document.getElementById('preorderKPI').innerHTML = `
+    ${kpiCard('Total Pre-orders', fmtNum(totalQty), 'vs. offline target ' + pctTarget + '%', '#1428A0')}
+    ${kpiCard('Amount (IDR)', fmtIDR(totalAmt), 'vs. offline target ' + amtTarget + '%', '#0ea5e9')}
+    ${kpiCard('Batch 1', fmtNum(batch1), 'Feb 26 – Mar 6', '#7c3aed')}
+    ${kpiCard('Batch 2', fmtNum(batch2), 'Mar 7 – Mar 17', '#f59e0b')}
+  `;
+}
+
+// ============================================================
+// PRE-ORDER CHART
+// ============================================================
+function renderPreorderChart() {
+  const all = getRecords();
+  const filtered = applyFilters(all);
+
+  // Determine selected products for multi-dataset
+  const selProds = filters.products.includes('all') ? PRODUCT_GROUPS : filters.products;
+
+  if (filters.granularity === 'hourly') {
+    renderHourlyChart(filtered, selProds);
+    return;
+  }
+
+  const dates = getUniqueDates(filtered);
+  const datasets = selProds.map(pg => {
+    const prodRecs = filtered.filter(r => r.productGroup === pg);
+    const grouped = {};
+    prodRecs.forEach(r => {
+      if (!grouped[r.date]) grouped[r.date] = 0;
+      grouped[r.date] += filters.metric === 'qty' ? 1 : r.price;
+    });
+    let values = dates.map(d => grouped[d] || 0);
+    if (filters.accumulation === 'cumulative') {
+      let cum = 0; values = values.map(v => cum += v);
+    }
+    return {
+      label: pg.replace('Galaxy ', ''),
+      data: values,
+      backgroundColor: PRODUCT_COLORS[pg]?.main || '#888',
+      borderRadius: 3,
+    };
+  });
+
+  const ctx = document.getElementById('preorderChart').getContext('2d');
+  if (preorderChart) preorderChart.destroy();
+  preorderChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dates.map(d => d.slice(5)), // MM-DD
+      datasets,
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.parsed.y) } },
+      },
+      scales: {
+        x: { stacked: preorderChartMode === 'stacked', grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { stacked: preorderChartMode === 'stacked', grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: v => filters.metric === 'amount' ? fmtIDR(v) : (v >= 1000 ? (v/1000).toFixed(0)+'K' : v) } },
+      },
+    },
+  });
+}
+
+function renderHourlyChart(filtered, selProds) {
+  const day = filters.selectedDay;
+  if (!day) return;
+  const hours = Array.from({length:24}, (_,i) => String(i).padStart(2,'0'));
+
+  const datasets = selProds.map(pg => {
+    const recs = filtered.filter(r => r.productGroup === pg && r.date === day);
+    const values = hours.map(h => recs.filter(r => r.time && r.time.startsWith(h)).reduce((s, r) => s + (filters.metric === 'qty' ? 1 : r.price), 0));
+    return {
+      label: pg.replace('Galaxy ', ''),
+      data: values,
+      backgroundColor: PRODUCT_COLORS[pg]?.main || '#888',
+      borderRadius: 3,
+    };
+  });
+
+  const ctx = document.getElementById('preorderChart').getContext('2d');
+  if (preorderChart) preorderChart.destroy();
+  preorderChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: hours.map(h => h + ':00'), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.parsed.y) } },
+      },
+      scales: {
+        x: { stacked: preorderChartMode === 'stacked', grid: { display: false }, ticks: { font: { size: 9 } } },
+        y: { stacked: preorderChartMode === 'stacked', grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: v => filters.metric === 'amount' ? fmtIDR(v) : v } },
+      },
+    },
+  });
+}
+
+// ============================================================
+// PICKUP KPI
+// ============================================================
+function renderPickupKPI() {
+  const all = getRecords();
+  const filtered = applyFilters(all);
+  const totalPre = filtered.length;
+  const pickedUp = filtered.filter(r => r.status === 'Sudah diambil').length;
+  const rate = totalPre > 0 ? ((pickedUp / totalPre) * 100).toFixed(1) : '0.0';
+
+  // By product rates
+  let rateTableHtml = '<table class="rate-table">';
+  PRODUCT_GROUPS.forEach(pg => {
+    const pRecs = filtered.filter(r => r.productGroup === pg);
+    const pPick = pRecs.filter(r => r.status === 'Sudah diambil').length;
+    const pRate = pRecs.length > 0 ? ((pPick / pRecs.length) * 100).toFixed(1) : '0.0';
+    const shortName = pg.replace('Galaxy ', '').replace(' Ultra', 'U').replace(' Plus', '+').replace(' Pro', 'P');
+    rateTableHtml += `<tr><td class="rprod">${shortName}</td><td class="rval">${pRate}%</td></tr>`;
+  });
+  rateTableHtml += '</table>';
+
+  // Batch rates
+  const b1Recs = filtered.filter(r => r.batch === 'Batch 1');
+  const b1Pick = b1Recs.filter(r => r.status === 'Sudah diambil').length;
+  const b1Rate = b1Recs.length > 0 ? ((b1Pick / b1Recs.length) * 100).toFixed(1) : '0.0';
+  const b2Recs = filtered.filter(r => r.batch === 'Batch 2');
+  const b2Pick = b2Recs.filter(r => r.status === 'Sudah diambil').length;
+  const b2Rate = b2Recs.length > 0 ? ((b2Pick / b2Recs.length) * 100).toFixed(1) : '0.0';
+
+  document.getElementById('pickupKPI').innerHTML = `
+    ${kpiCard('Total Pick-ups', fmtNum(pickedUp), 'out of ' + fmtNum(totalPre) + ' pre-orders', '#10b981')}
+    ${kpiCard('Overall Pickup Rate', rate + '%', fmtNum(pickedUp) + ' / ' + fmtNum(totalPre), '#1428A0')}
+    <div class="kpi-card"><div class="bar" style="background:#1428A0"></div>
+      <div class="kpi-label">Rate by Product</div>${rateTableHtml}</div>
+    ${kpiCard('Batch 1 Rate', b1Rate + '%', fmtNum(b1Pick) + ' / ' + fmtNum(b1Recs.length), '#7c3aed')}
+    ${kpiCard('Batch 2 Rate', b2Rate + '%', fmtNum(b2Pick) + ' / ' + fmtNum(b2Recs.length), '#f59e0b')}
+  `;
+}
+
+// ============================================================
+// PICKUP CHART
+// ============================================================
+function renderPickupChart() {
+  const all = getRecords();
+  const filtered = applyFilters(all);
+  const pickedUp = filtered.filter(r => r.status === 'Sudah diambil');
+
+  const selProds = filters.products.includes('all') ? PRODUCT_GROUPS : filters.products;
+  const dates = getUniqueDates(pickedUp.length > 0 ? pickedUp : filtered);
+  // Include all dates from filtered for x-axis consistency
+  const allDates = getUniqueDates(filtered);
+  const useDates = allDates.length > dates.length ? allDates : dates;
+
+  const datasets = selProds.map(pg => {
+    const recs = pickedUp.filter(r => r.productGroup === pg);
+    const grouped = {};
+    recs.forEach(r => {
+      const d = r.pickupDate || r.date;
+      if (!grouped[d]) grouped[d] = 0;
+      grouped[d]++;
+    });
+    return {
+      label: pg.replace('Galaxy ', ''),
+      data: useDates.map(d => grouped[d] || 0),
+      backgroundColor: PRODUCT_COLORS[pg]?.main || '#888',
+      borderRadius: 3,
+    };
+  });
+
+  const ctx = document.getElementById('pickupChart').getContext('2d');
+  if (pickupChart) pickupChart.destroy();
+  pickupChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: useDates.map(d => d.slice(5)), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.parsed.y) } },
+      },
+      scales: {
+        x: { stacked: pickupChartMode === 'stacked', grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { stacked: pickupChartMode === 'stacked', grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 } } },
+      },
+    },
+  });
+}
+
+// ============================================================
+// COMPARE TAB
+// ============================================================
+function renderCompare() {
+  const selA = document.getElementById('compareA');
+  const selB = document.getElementById('compareB');
+  const emptyC = document.getElementById('emptyCompare');
+  const kpiC = document.getElementById('compareKPI');
+  const chartsC = document.querySelector('.compare-charts');
+  const prodStrip = document.getElementById('productCompareStrip');
+
+  // Build options
+  const campaigns = [];
+  if (currentCampaign) campaigns.push({ id: '_current', name: currentCampaign.name || 'Current', records: currentCampaign.records });
+  pastCampaigns.forEach(c => campaigns.push({ id: c.id, name: c.name + ' · ' + c.year, records: c.records }));
+
+  if (campaigns.length < 2) {
+    [kpiC, chartsC, prodStrip].forEach(el => el.style.display = 'none');
+    emptyC.style.display = '';
+    selA.innerHTML = '<option>No data</option>';
+    selB.innerHTML = '<option>No data</option>';
+    return;
+  }
+
+  emptyC.style.display = 'none';
+  [kpiC, chartsC, prodStrip].forEach(el => el.style.display = '');
+
+  // Populate selects (keep selection)
+  const prevA = selA.value, prevB = selB.value;
+  selA.innerHTML = campaigns.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  selB.innerHTML = campaigns.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  if (campaigns.find(c => c.id === prevA)) selA.value = prevA;
+  else selA.value = campaigns[0].id;
+  if (campaigns.find(c => c.id === prevB)) selB.value = prevB;
+  else selB.value = campaigns.length > 1 ? campaigns[1].id : campaigns[0].id;
+
+  // Remove old listeners, add new
+  selA.onchange = () => renderCompare();
+  selB.onchange = () => renderCompare();
+
+  const campA = campaigns.find(c => c.id === selA.value);
+  const campB = campaigns.find(c => c.id === selB.value);
+  if (!campA || !campB) return;
+
+  const recsA = campA.records;
+  const recsB = campB.records;
+  const isQty = compareMetric === 'qty';
+
+  // Same-day alignment
+  const datesA = [...new Set(recsA.map(r => r.date))].sort();
+  const datesB = [...new Set(recsB.map(r => r.date))].sort();
+  const startA = datesA[0], startB = datesB[0];
+  const maxDays = Math.max(datesA.length, datesB.length);
+  const dayLabels = Array.from({length: maxDays}, (_, i) => 'Day ' + (i + 1));
+
+  function dayData(recs, dates, metric) {
+    return dates.map(d => recs.filter(r => r.date === d).reduce((s, r) => s + (metric === 'qty' ? 1 : r.price), 0));
+  }
+
+  const valA = dayData(recsA, datesA, compareMetric);
+  const valB = dayData(recsB, datesB, compareMetric);
+
+  // Pad shorter
+  while (valA.length < maxDays) valA.push(0);
+  while (valB.length < maxDays) valB.push(0);
+
+  // KPI Compare
+  const totalA = isQty ? recsA.length : recsA.reduce((s,r) => s + r.price, 0);
+  const totalB = isQty ? recsB.length : recsB.reduce((s,r) => s + r.price, 0);
+  const amtA = recsA.reduce((s,r) => s + r.price, 0);
+  const amtB = recsB.reduce((s,r) => s + r.price, 0);
+  const pickA = recsA.filter(r => r.status === 'Sudah diambil').length;
+  const pickB = recsB.filter(r => r.status === 'Sudah diambil').length;
+  const prateA = recsA.length ? ((pickA/recsA.length)*100).toFixed(1) : '0.0';
+  const prateB = recsB.length ? ((pickB/recsB.length)*100).toFixed(1) : '0.0';
+  const day1A = valA[0] || 0;
+  const day1B = valB[0] || 0;
+  const avgA = datesA.length ? (isQty ? recsA.length / datesA.length : amtA / datesA.length) : 0;
+  const avgB = datesB.length ? (isQty ? recsB.length / datesB.length : amtB / datesB.length) : 0;
+
+  // Same-day comparison (use min of days available)
+  const compareDays = Math.min(datesA.length, datesB.length);
+  const sameDayTotalA = valA.slice(0, compareDays).reduce((s,v) => s+v, 0);
+  const sameDayTotalB = valB.slice(0, compareDays).reduce((s,v) => s+v, 0);
+
+  kpiC.innerHTML = `
+    ${compareCard('Total Pre-orders', fmtNum(isQty ? recsB.length : amtB), fmtNum(isQty ? recsA.length : amtA), deltaPercent(isQty ? recsB.length : amtB, isQty ? recsA.length : amtA))}
+    ${compareCard('Amount (IDR)', fmtIDR(amtB), fmtIDR(amtA), deltaPercent(amtB, amtA))}
+    ${compareCard('Pickup Rate', prateB + '%', prateA + '%', deltaPercent(parseFloat(prateB), parseFloat(prateA)))}
+    ${compareCard('Day 1 Orders', fmtNum(day1B), fmtNum(day1A), deltaPercent(day1B, day1A))}
+    ${compareCard('Avg. Daily', fmtNum(Math.round(avgB)), fmtNum(Math.round(avgA)), deltaPercent(avgB, avgA))}
+  `;
+
+  // Daily chart
+  const ctxD = document.getElementById('compareDailyChart').getContext('2d');
+  if (compareDailyChart) compareDailyChart.destroy();
+  compareDailyChart = new Chart(ctxD, {
+    type: 'bar',
+    data: {
+      labels: dayLabels,
+      datasets: [
+        { label: campB.name, data: valB.slice(0, maxDays), backgroundColor: '#1428A0', borderRadius: 3 },
+        { label: campA.name, data: valA.slice(0, maxDays), backgroundColor: '#9ca3af', borderRadius: 3 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, font: { size: 10 } } } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 9 } } }, y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: v => isQty ? (v >= 1000 ? (v/1000).toFixed(0)+'K' : v) : fmtIDR(v) } } },
+    },
+  });
+
+  // Cumulative chart
+  let cumA = [], cumB = [], ca = 0, cb = 0;
+  for (let i = 0; i < maxDays; i++) { ca += valA[i]; cb += valB[i]; cumA.push(ca); cumB.push(cb); }
+
+  const ctxC = document.getElementById('compareCumChart').getContext('2d');
+  if (compareCumChart) compareCumChart.destroy();
+  compareCumChart = new Chart(ctxC, {
+    type: 'line',
+    data: {
+      labels: dayLabels,
+      datasets: [
+        { label: campB.name, data: cumB, borderColor: '#1428A0', backgroundColor: 'rgba(20,40,160,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: campA.name, data: cumA, borderColor: '#9ca3af', backgroundColor: 'rgba(156,163,175,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, font: { size: 10 } } } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 9 } } }, y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: v => isQty ? (v >= 1000 ? (v/1000).toFixed(0)+'K' : v) : fmtIDR(v) } } },
+    },
+  });
+
+  // Product comparison
+  prodStrip.innerHTML = '';
+  PRODUCT_GROUPS.forEach(pg => {
+    const pA = recsA.filter(r => r.productGroup === pg);
+    const pB = recsB.filter(r => r.productGroup === pg);
+    const vA = isQty ? pA.length : pA.reduce((s,r)=>s+r.price,0);
+    const vB = isQty ? pB.length : pB.reduce((s,r)=>s+r.price,0);
+    prodStrip.innerHTML += `<div class="kpi-card">
+      <div class="bar" style="background:${PRODUCT_COLORS[pg]?.main || '#888'}"></div>
+      <div class="kpi-label">${pg.replace('Galaxy ','')}</div>
+      <div class="kpi-value" style="font-size:18px">${fmtNum(vA)}</div>
+      <div class="kpi-sub">prev: ${fmtNum(vB)} <span class="${deltaClass(vA, vB)}">${deltaPercent(vA, vB)}</span></div>
+    </div>`;
+  });
+}
+
+function compareCard(label, valB, valA, delta) {
+  const cls = delta.startsWith('+') || delta.startsWith('▲') ? 'delta up' : delta.startsWith('-') || delta.startsWith('▼') ? 'delta down' : '';
+  return `<div class="kpi-card">
+    <div class="kpi-label">${label}</div>
+    <div style="display:flex;align-items:baseline;gap:8px;">
+      <span class="kpi-value" style="font-size:20px">${valA}</span>
+      <span style="font-size:11px;color:var(--text-muted)">vs ${valB}</span>
+    </div>
+    <div class="kpi-sub"><span class="${cls}">${delta}</span></div>
+  </div>`;
+}
+
+function deltaPercent(curr, prev) {
+  if (!prev || prev === 0) return curr > 0 ? '▲ new' : '—';
+  const pct = ((curr - prev) / prev * 100).toFixed(1);
+  return pct > 0 ? '▲ +' + pct + '%' : pct < 0 ? '▼ ' + pct + '%' : '—';
+}
+
+function deltaClass(curr, prev) {
+  if (!prev) return 'delta up';
+  return curr >= prev ? 'delta up' : 'delta down';
+}
+
+// ============================================================
+// EXPORT CSV
+// ============================================================
+function exportCSV() {
+  const records = applyFilters(getRecords());
+  if (!records.length) { showToast('No data to export'); return; }
+  const headers = ['Date','Time','Batch','Product Group','Price','Distributor','Status','Pickup Date','Pickup Time'];
+  const rows = records.map(r => [r.date,r.time,r.batch,r.productGroup,r.price,r.distributor,r.status,r.pickupDate,r.pickupTime]);
+  let csv = headers.join(',') + '\n' + rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'preorder_export_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function kpiCard(label, value, sub, color) {
+  return `<div class="kpi-card"><div class="bar" style="background:${color}"></div>
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    <div class="kpi-sub">${sub}</div></div>`;
+}
+
+function fmtNum(n) {
+  if (n == null) return '0';
+  return Number(n).toLocaleString();
+}
+
+function fmtIDR(n) {
+  if (n >= 1e12) return (n/1e12).toFixed(1) + 'T';
+  if (n >= 1e9)  return (n/1e9).toFixed(1) + 'B';
+  if (n >= 1e6)  return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3)  return (n/1e3).toFixed(1) + 'K';
+  return Number(n).toLocaleString();
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
