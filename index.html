@@ -149,6 +149,21 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
 .empty-state .btn-go { padding: 8px 18px; background: var(--primary); color: #fff; border: none; border-radius: 5px; font-size: 13px; cursor: pointer; margin-top: 8px; }
 .empty-state .btn-go:hover { background: #102088; }
 
+/* === LOADING OVERLAY === */
+.loading-overlay { position: fixed; inset: 0; background: rgba(240,242,247,0.92); display: flex; align-items: center; justify-content: center; z-index: 500; }
+.loading-overlay.hidden { display: none; }
+.loading-box { background: #fff; border-radius: 12px; padding: 32px 40px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.12); min-width: 260px; }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.loading-progress { font-size: 12px; color: var(--text-muted); min-height: 16px; }
+.loading-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; margin-top: 12px; overflow: hidden; }
+.loading-bar { height: 100%; background: var(--primary); border-radius: 2px; transition: width 0.3s; }
+.error-banner { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; font-size: 12px; padding: 8px 16px; text-align: center; }
+
+/* === NAV UPDATED TIME === */
+.updated-time { font-size: 11px; color: #6b8099; }
+
 /* === TOAST === */
 .toast { position: fixed; top: 60px; right: 20px; background: var(--dark-navy); color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 13px; z-index: 999; opacity: 0; transform: translateY(-10px); transition: all 0.3s; pointer-events: none; }
 .toast.show { opacity: 1; transform: translateY(0); }
@@ -177,6 +192,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   <span class="campaign-name" id="navCampaignName">Pre-order Dashboard</span>
   <span class="live-dot" id="liveDot" style="display:none;"></span>
   <span class="spacer"></span>
+  <span class="updated-time" id="updatedTime"></span>
   <button class="btn-nav" id="btnExport" onclick="exportCSV()">&#x2B73; Export CSV</button>
 </div>
 
@@ -185,7 +201,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   <button class="tab-btn active" data-tab="preorder">Pre-order</button>
   <button class="tab-btn" data-tab="pickup">Pick-up</button>
   <button class="tab-btn" data-tab="compare">Compare</button>
-  <button class="tab-btn" data-tab="upload">Upload</button>
+  <button class="tab-btn" data-tab="upload">Compare Data</button>
 </div>
 
 <!-- FILTER ROW -->
@@ -238,8 +254,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   </div>
   <div class="empty-state" id="emptyPreorder">
     <div class="icon">&#x1F4CA;</div>
-    <div class="msg">Upload data to get started</div>
-    <button class="btn-go" onclick="switchTab('upload')">Go to Upload</button>
+    <div class="msg">Loading data from API...</div>
   </div>
 </div>
 
@@ -259,8 +274,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   </div>
   <div class="empty-state" id="emptyPickup">
     <div class="icon">&#x1F4CA;</div>
-    <div class="msg">Upload data to get started</div>
-    <button class="btn-go" onclick="switchTab('upload')">Go to Upload</button>
+    <div class="msg">Loading data from API...</div>
   </div>
 </div>
 
@@ -297,27 +311,11 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   </div>
 </div>
 
-<!-- SCREEN: Upload -->
+<!-- SCREEN: Compare Data (Upload past campaigns) -->
 <div class="upload-screen" id="screen-upload">
-  <!-- Left: Current Campaign -->
-  <div class="upload-panel">
-    <h3>Current Campaign</h3>
-    <div class="subtitle" id="currentCampaignInfo">Galaxy S26 Series &middot; 2026</div>
-    <div class="drop-zone" id="dropCurrent">
-      <div class="icon">&#x1F4C4;</div>
-      <div class="text">Drop Excel file here</div>
-      <div class="hint">or click to browse &middot; .xlsx only</div>
-    </div>
-    <input type="file" id="fileInputCurrent" accept=".xlsx" style="display:none">
-    <div class="upload-history" id="uploadHistory">
-      <h4>Upload History</h4>
-    </div>
-    <button class="btn-clear" onclick="clearCurrentData()">Clear All Data</button>
-  </div>
-  <!-- Right: Past Campaign -->
-  <div class="upload-panel">
+  <div class="upload-panel" style="max-width:480px;">
     <h3>Past Campaign (for Comparison)</h3>
-    <div class="subtitle">Upload previous campaign data for comparison</div>
+    <div class="subtitle">Upload previous campaign Excel to compare with the current campaign</div>
     <div class="past-form">
       <label>Campaign Name</label>
       <input type="text" id="pastName" placeholder="e.g. S25 Series">
@@ -338,10 +336,40 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); co
   </div>
 </div>
 
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Connecting to Shopl API...</div>
+    <div class="loading-progress" id="loadingProgress">Initializing...</div>
+    <div class="loading-bar-wrap"><div class="loading-bar" id="loadingBar" style="width:0%"></div></div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
+// ============================================================
+// API CONFIG
+// ============================================================
+const API_BASE      = 'https://dashboard.shoplworks.com';
+const API_CAMPAIGN  = '26b704cf-8b77-4c07-bbe3-c79bc8c9ba8c';
+const API_AUTH      = '***REDACTED***';
+const API_PAGE_SIZE = 1000;
+const API_START     = '2026-02-26';
+const API_END       = '2026-03-17';
+const POLL_INTERVAL = 10 * 60 * 1000; // 10 minutes
+
+const SKU_PRICE = {
+  'SM-S948BZKCXID':24499000,'SM-S948BZWCXID':24499000,'SM-S948BZVCXID':24499000,'SM-S948BLBCXID':24499000,
+  'SM-S948BZWQXID':27499000,'SM-S948BZVQXID':27499000,'SM-S948BZKQXID':27499000,'SM-S948BLBQXID':27499000,
+  'SM-S947BZKCXID':19499000,'SM-S947BZWCXID':19499000,'SM-S947BZVCXID':19499000,'SM-S947BLBCXID':19499000,
+  'SM-S942BZKQXID':16499000,'SM-S942BZWQXID':16499000,'SM-S942BZVQXID':16499000,'SM-S942BLBQXID':16499000,
+  'SM-R640NZKAXSE':3999000, 'SM-R640NZWAXSE':3399150,
+  'SM-R540NZKAXSE':2549150, 'SM-R540NZWAXSE':2549150,
+};
+
 // ============================================================
 // STATE
 // ============================================================
@@ -384,19 +412,127 @@ document.addEventListener('DOMContentLoaded', () => {
   setupTabs();
   setupFilterToggles();
   setupUpload();
-  // Load embedded data.json first, then fallback to localStorage
-  fetch('data.json').then(r => r.ok ? r.json() : null).then(data => {
-    if (data && data.records && data.records.length) {
-      currentCampaign = { name: data.name, period: data.period, uploadedAt: data.updatedAt, files: [], records: data.records };
-      const distSet = new Set();
-      data.records.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
-      distributors = [...distSet].sort();
-    } else {
-      loadFromStorage();
-    }
-    renderAll();
-  }).catch(() => { loadFromStorage(); renderAll(); });
+  loadPastCampaigns();
+  fetchAllOrders();
+  setInterval(fetchAllOrders, POLL_INTERVAL);
 });
+
+// ============================================================
+// API FETCH
+// ============================================================
+function extractProductGroup(promotionName) {
+  const name = promotionName || '';
+  for (const g of PRODUCT_GROUPS) { if (name.includes(g)) return g; }
+  return name;
+}
+
+function mapApiRecord(r, batchMap) {
+  const dt = r.orderDate || '';
+  const pdt = r.pickUpDt || '';
+  return {
+    date:         dt.slice(0, 10),
+    time:         dt.length >= 16 ? dt.slice(11, 16) : '',
+    batch:        batchMap[r.batchId] || 'Batch 1',
+    productGroup: extractProductGroup(r.promotionName),
+    price:        SKU_PRICE[r.productSKU] || 0,
+    distributor:  r.retailerName || '',
+    status:       r.orderStatus === 'DONE' ? 'Sudah diambil' : 'Belum diambil',
+    pickupDate:   pdt.slice(0, 10),
+    pickupTime:   pdt.length >= 16 ? pdt.slice(11, 16) : '',
+  };
+}
+
+async function fetchAllOrders() {
+  const overlay = document.getElementById('loadingOverlay');
+  const loadText = document.getElementById('loadingText');
+  const loadProg = document.getElementById('loadingProgress');
+  const loadBar = document.getElementById('loadingBar');
+
+  overlay.classList.remove('hidden');
+  loadText.textContent = 'Fetching pre-order data...';
+  loadProg.textContent = 'Page 1 of ?';
+  loadBar.style.width = '0%';
+
+  try {
+    // Fetch first page to get total
+    const first = await fetchPage(0);
+    const total = first.totalElements;
+    const totalPages = Math.ceil(total / API_PAGE_SIZE);
+    let allContent = [...first.content];
+
+    for (let page = 1; page < totalPages; page++) {
+      const pct = Math.round((page / totalPages) * 100);
+      loadProg.textContent = `Page ${page + 1} of ${totalPages} (${pct}%)`;
+      loadBar.style.width = pct + '%';
+      const body = await fetchPage(page);
+      allContent = allContent.concat(body.content);
+    }
+
+    loadBar.style.width = '100%';
+    loadProg.textContent = `Processing ${allContent.length.toLocaleString()} records...`;
+
+    // Build batch map: sort batchIds by earliest orderDate
+    const batchEarliest = {};
+    allContent.forEach(r => {
+      const bid = r.batchId, dt = r.orderDate || '';
+      if (!batchEarliest[bid] || dt < batchEarliest[bid]) batchEarliest[bid] = dt;
+    });
+    const sortedBatches = Object.keys(batchEarliest).sort((a, b) => batchEarliest[a].localeCompare(batchEarliest[b]));
+    const batchMap = {};
+    sortedBatches.forEach((bid, i) => { batchMap[bid] = 'Batch ' + (i + 1); });
+
+    // Map records
+    const records = allContent.map(r => mapApiRecord(r, batchMap));
+
+    // Build campaign meta
+    const dates = [...new Set(records.map(r => r.date).filter(Boolean))].sort();
+    const period = dates.length ? dates[0] + ' ~ ' + dates[dates.length - 1] : API_START + ' ~ ' + API_END;
+
+    currentCampaign = {
+      name: 'Pre-order Galaxy S26 Series & Galaxy Buds4 Series',
+      period,
+      uploadedAt: new Date().toISOString(),
+      records,
+    };
+
+    const distSet = new Set();
+    records.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
+    distributors = [...distSet].sort();
+
+    overlay.classList.add('hidden');
+    renderAll();
+
+    // Show error banner if any
+    document.getElementById('errorBanner')?.remove();
+
+  } catch (err) {
+    console.error('API fetch failed:', err);
+    overlay.classList.add('hidden');
+
+    let banner = document.getElementById('errorBanner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'errorBanner';
+      banner.className = 'error-banner';
+      document.querySelector('.tabs').after(banner);
+    }
+    banner.textContent = 'Unable to load data. Retrying in 10 minutes... (' + err.message + ')';
+
+    // If we have existing data, keep showing it
+    if (currentCampaign) renderAll();
+  }
+}
+
+async function fetchPage(page) {
+  const url = `${API_BASE}/api/po/campaign/${API_CAMPAIGN}/orders` +
+    `?authKey=${API_AUTH}&page=${page}&pageSize=${API_PAGE_SIZE}` +
+    `&startDate=${API_START}&endDate=${API_END}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.statusCode !== 'Success') throw new Error(json.errorMessage || 'API error');
+  return json.body;
+}
 
 function expandRecords(recs) {
   if (!recs || !recs.length) return recs || [];
@@ -406,39 +542,18 @@ function expandRecords(recs) {
   return recs;
 }
 
-function loadFromStorage() {
+function loadPastCampaigns() {
   try {
-    const cc = localStorage.getItem('currentCampaign');
-    if (cc) {
-      currentCampaign = JSON.parse(cc);
-      if (currentCampaign.records) currentCampaign.records = expandRecords(currentCampaign.records);
-    }
     const pc = localStorage.getItem('pastCampaigns');
     if (pc) {
       pastCampaigns = JSON.parse(pc);
       pastCampaigns.forEach(c => { c.records = expandRecords(c.records); });
     }
   } catch(e) { console.error('Storage load error', e); }
-  if (currentCampaign && currentCampaign.records) {
-    const distSet = new Set();
-    currentCampaign.records.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
-    distributors = [...distSet].sort();
-  }
 }
 
-function saveToStorage() {
+function savePastCampaigns() {
   try {
-    if (currentCampaign) {
-      // Save lightweight version to avoid localStorage 5MB limit
-      const lite = {
-        name: currentCampaign.name, period: currentCampaign.period,
-        uploadedAt: currentCampaign.uploadedAt, files: currentCampaign.files,
-        records: currentCampaign.records.map(r => [r.date,r.time,r.batch,r.productGroup,r.price,r.distributor,r.status,r.pickupDate||'',r.pickupTime||''])
-      };
-      localStorage.setItem('currentCampaign', JSON.stringify(lite));
-    } else {
-      localStorage.removeItem('currentCampaign');
-    }
     localStorage.setItem('pastCampaigns', JSON.stringify(pastCampaigns.map(c => ({
       ...c, records: c.records.map(r => [r.date,r.time,r.batch,r.productGroup,r.price,r.distributor,r.status,r.pickupDate||'',r.pickupTime||''])
     }))));
@@ -670,19 +785,9 @@ function makeLightRecords(records) {
 }
 
 // ============================================================
-// UPLOAD HANDLING
+// UPLOAD HANDLING (Past campaigns for Compare tab only)
 // ============================================================
 function setupUpload() {
-  // Current campaign
-  const dzC = document.getElementById('dropCurrent');
-  const fiC = document.getElementById('fileInputCurrent');
-  dzC.addEventListener('click', () => fiC.click());
-  dzC.addEventListener('dragover', e => { e.preventDefault(); dzC.classList.add('dragover'); });
-  dzC.addEventListener('dragleave', () => dzC.classList.remove('dragover'));
-  dzC.addEventListener('drop', e => { e.preventDefault(); dzC.classList.remove('dragover'); handleCurrentFile(e.dataTransfer.files[0]); });
-  fiC.addEventListener('change', e => { if (e.target.files[0]) handleCurrentFile(e.target.files[0]); });
-
-  // Past campaign
   const dzP = document.getElementById('dropPast');
   const fiP = document.getElementById('fileInputPast');
   dzP.addEventListener('click', () => fiP.click());
@@ -690,46 +795,6 @@ function setupUpload() {
   dzP.addEventListener('dragleave', () => dzP.classList.remove('dragover'));
   dzP.addEventListener('drop', e => { e.preventDefault(); dzP.classList.remove('dragover'); handlePastFile(e.dataTransfer.files[0]); });
   fiP.addEventListener('change', e => { if (e.target.files[0]) handlePastFile(e.target.files[0]); });
-}
-
-function handleCurrentFile(file) {
-  if (!file || !file.name.endsWith('.xlsx')) { showToast('Please upload a .xlsx file'); return; }
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const parsed = parseExcel(wb);
-      if (!parsed.records.length) { showToast('Could not parse file. Please upload a Shopl Pre-order export.'); return; }
-      const light = makeLightRecords(parsed.records);
-      const now = new Date().toISOString();
-      if (!currentCampaign) {
-        currentCampaign = { name: parsed.campaignName, period: parsed.period, uploadedAt: now, files: [], records: light };
-      }
-      currentCampaign.records = light;
-      currentCampaign.name = parsed.campaignName;
-      currentCampaign.period = parsed.period;
-      currentCampaign.uploadedAt = now;
-      if (!currentCampaign.files) currentCampaign.files = [];
-      currentCampaign.files.unshift({ name: file.name, date: now });
-      if (currentCampaign.files.length > 10) currentCampaign.files = currentCampaign.files.slice(0, 10);
-
-      // Update distributors
-      const distSet = new Set();
-      light.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
-      distributors = [...distSet].sort();
-
-      saveToStorage();
-      showToast('\u2713 ' + light.length.toLocaleString() + ' orders loaded');
-      renderPills();
-      renderAll();
-      renderUploadHistory();
-      updateNav();
-    } catch(err) {
-      showToast('Could not parse file. Please upload a Shopl Pre-order export.');
-      console.error(err);
-    }
-  };
-  reader.readAsArrayBuffer(file);
 }
 
 function handlePastFile(file) {
@@ -749,7 +814,7 @@ function handlePastFile(file) {
       // Remove existing with same id
       pastCampaigns = pastCampaigns.filter(c => c.id !== id);
       pastCampaigns.unshift({ id, name, year, uploadedAt: new Date().toISOString(), records: light });
-      saveToStorage();
+      savePastCampaigns();
       showToast('\u2713 ' + name + ' · ' + light.length.toLocaleString() + ' orders saved');
       renderUploadHistory();
       document.getElementById('pastName').value = '';
@@ -761,34 +826,12 @@ function handlePastFile(file) {
   reader.readAsArrayBuffer(file);
 }
 
-function clearCurrentData() {
-  if (!confirm('Clear all current campaign data?')) return;
-  currentCampaign = null;
-  localStorage.removeItem('currentCampaign');
-  distributors = [];
-  renderPills();
-  renderAll();
-  renderUploadHistory();
-  updateNav();
-  showToast('Data cleared');
-}
-
 function renderUploadHistory() {
-  const hist = document.getElementById('uploadHistory');
-  let html = '<h4>Upload History</h4>';
-  if (currentCampaign && currentCampaign.files) {
-    currentCampaign.files.forEach(f => {
-      const d = new Date(f.date);
-      const isToday = new Date().toDateString() === d.toDateString();
-      const label = isToday ? 'Today ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : d.toLocaleDateString();
-      html += `<div class="history-item"><span class="icon">&#x1F4C4;</span><span class="name">${esc(f.name)}</span><span class="date">${label}</span></div>`;
-    });
-  }
-  hist.innerHTML = html;
-
-  // Saved past campaigns
   const sc = document.getElementById('savedCampaigns');
   let sh = '<h4>Saved Campaigns</h4>';
+  if (!pastCampaigns.length) {
+    sh += '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">No past campaigns saved yet.</div>';
+  }
   pastCampaigns.forEach(c => {
     sh += `<div class="saved-campaign">
       <span>&#x1F4CA;</span>
@@ -801,7 +844,7 @@ function renderUploadHistory() {
 
 function deletePastCampaign(id) {
   pastCampaigns = pastCampaigns.filter(c => c.id !== id);
-  saveToStorage();
+  savePastCampaigns();
   renderUploadHistory();
   showToast('Campaign removed');
 }
@@ -884,12 +927,18 @@ function renderAll() {
 function updateNav() {
   const n = document.getElementById('navCampaignName');
   const dot = document.getElementById('liveDot');
+  const ut = document.getElementById('updatedTime');
   if (currentCampaign) {
     n.textContent = currentCampaign.name || 'Pre-order Dashboard';
     dot.style.display = '';
+    if (currentCampaign.uploadedAt) {
+      const d = new Date(currentCampaign.uploadedAt);
+      ut.textContent = 'Updated ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
   } else {
     n.textContent = 'Pre-order Dashboard';
     dot.style.display = 'none';
+    ut.textContent = '';
   }
 }
 
