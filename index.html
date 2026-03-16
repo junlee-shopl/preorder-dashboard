@@ -940,6 +940,25 @@ function renderHourlyChart(filtered, selProds) {
   const day = filters.selectedDay;
   if (!day) return;
   const hours = Array.from({length:24}, (_,i) => String(i).padStart(2,'0'));
+  const allDates = getUniqueDates();
+  const isStacked = preorderChartMode === 'stacked';
+
+  // Compute global Y-axis max across ALL days so scale stays fixed when switching dates
+  let globalMax = 0;
+  allDates.forEach(d => {
+    hours.forEach(h => {
+      const hourTotal = isStacked
+        ? selProds.reduce((sum, pg) => {
+            const recs = filtered.filter(r => r.productGroup === pg && r.date === d && r.time && r.time.startsWith(h));
+            return sum + recs.reduce((s, r) => s + (filters.metric === 'qty' ? 1 : r.price), 0);
+          }, 0)
+        : Math.max(...selProds.map(pg => {
+            const recs = filtered.filter(r => r.productGroup === pg && r.date === d && r.time && r.time.startsWith(h));
+            return recs.reduce((s, r) => s + (filters.metric === 'qty' ? 1 : r.price), 0);
+          }));
+      if (hourTotal > globalMax) globalMax = hourTotal;
+    });
+  });
 
   const datasets = selProds.map(pg => {
     const recs = filtered.filter(r => r.productGroup === pg && r.date === day);
@@ -964,8 +983,8 @@ function renderHourlyChart(filtered, selProds) {
         tooltip: { callbacks: { label: tip => tip.dataset.label + ': ' + (filters.metric === 'amount' ? fmtIDR(tip.parsed.y) : fmtNum(tip.parsed.y)) } },
       },
       scales: {
-        x: { stacked: preorderChartMode === 'stacked', grid: { display: false }, ticks: { font: { size: 9 } } },
-        y: { stacked: preorderChartMode === 'stacked', grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: v => filters.metric === 'amount' ? fmtIDR(v) : v } },
+        x: { stacked: isStacked, grid: { display: false }, ticks: { font: { size: 9 } } },
+        y: { stacked: isStacked, suggestedMax: globalMax, grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: v => filters.metric === 'amount' ? fmtIDR(v) : v } },
       },
     },
   });
