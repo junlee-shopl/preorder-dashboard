@@ -413,125 +413,39 @@ document.addEventListener('DOMContentLoaded', () => {
   setupFilterToggles();
   setupUpload();
   loadPastCampaigns();
-  fetchAllOrders();
-  setInterval(fetchAllOrders, POLL_INTERVAL);
+  loadDataJson();
 });
 
-// ============================================================
-// API FETCH
-// ============================================================
-function extractProductGroup(promotionName) {
-  const name = promotionName || '';
-  for (const g of PRODUCT_GROUPS) { if (name.includes(g)) return g; }
-  return name;
-}
-
-function mapApiRecord(r, batchMap) {
-  const dt = r.orderDate || '';
-  const pdt = r.pickUpDt || '';
-  return {
-    date:         dt.slice(0, 10),
-    time:         dt.length >= 16 ? dt.slice(11, 16) : '',
-    batch:        batchMap[r.batchId] || 'Batch 1',
-    productGroup: extractProductGroup(r.promotionName),
-    price:        SKU_PRICE[r.productSKU] || 0,
-    distributor:  r.retailerName || '',
-    status:       r.orderStatus === 'DONE' ? 'Sudah diambil' : 'Belum diambil',
-    pickupDate:   pdt.slice(0, 10),
-    pickupTime:   pdt.length >= 16 ? pdt.slice(11, 16) : '',
-  };
-}
-
-async function fetchAllOrders() {
+function loadDataJson() {
   const overlay = document.getElementById('loadingOverlay');
   const loadText = document.getElementById('loadingText');
   const loadProg = document.getElementById('loadingProgress');
   const loadBar = document.getElementById('loadingBar');
 
   overlay.classList.remove('hidden');
-  loadText.textContent = 'Fetching pre-order data...';
-  loadProg.textContent = 'Page 1 of ?';
-  loadBar.style.width = '0%';
+  loadText.textContent = 'Loading pre-order data...';
+  loadProg.textContent = 'Fetching data.json';
+  loadBar.style.width = '30%';
 
-  try {
-    // Fetch first page to get total
-    const first = await fetchPage(0);
-    const total = first.totalElements;
-    const totalPages = Math.ceil(total / API_PAGE_SIZE);
-    let allContent = [...first.content];
+  fetch('data.json?t=' + Date.now())
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(data => {
+      loadBar.style.width = '100%';
+      if (!data || !data.records || !data.records.length) throw new Error('Empty data');
 
-    for (let page = 1; page < totalPages; page++) {
-      const pct = Math.round((page / totalPages) * 100);
-      loadProg.textContent = `Page ${page + 1} of ${totalPages} (${pct}%)`;
-      loadBar.style.width = pct + '%';
-      const body = await fetchPage(page);
-      allContent = allContent.concat(body.content);
-    }
+      currentCampaign = { name: data.name, period: data.period, uploadedAt: data.updatedAt, records: data.records };
+      const distSet = new Set();
+      data.records.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
+      distributors = [...distSet].sort();
 
-    loadBar.style.width = '100%';
-    loadProg.textContent = `Processing ${allContent.length.toLocaleString()} records...`;
-
-    // Build batch map: sort batchIds by earliest orderDate
-    const batchEarliest = {};
-    allContent.forEach(r => {
-      const bid = r.batchId, dt = r.orderDate || '';
-      if (!batchEarliest[bid] || dt < batchEarliest[bid]) batchEarliest[bid] = dt;
+      overlay.classList.add('hidden');
+      renderAll();
+    })
+    .catch(err => {
+      console.error('data.json load failed:', err);
+      overlay.classList.add('hidden');
+      loadProg.textContent = '';
     });
-    const sortedBatches = Object.keys(batchEarliest).sort((a, b) => batchEarliest[a].localeCompare(batchEarliest[b]));
-    const batchMap = {};
-    sortedBatches.forEach((bid, i) => { batchMap[bid] = 'Batch ' + (i + 1); });
-
-    // Map records
-    const records = allContent.map(r => mapApiRecord(r, batchMap));
-
-    // Build campaign meta
-    const dates = [...new Set(records.map(r => r.date).filter(Boolean))].sort();
-    const period = dates.length ? dates[0] + ' ~ ' + dates[dates.length - 1] : API_START + ' ~ ' + API_END;
-
-    currentCampaign = {
-      name: 'Pre-order Galaxy S26 Series & Galaxy Buds4 Series',
-      period,
-      uploadedAt: new Date().toISOString(),
-      records,
-    };
-
-    const distSet = new Set();
-    records.forEach(r => { if (r.distributor) distSet.add(r.distributor); });
-    distributors = [...distSet].sort();
-
-    overlay.classList.add('hidden');
-    renderAll();
-
-    // Show error banner if any
-    document.getElementById('errorBanner')?.remove();
-
-  } catch (err) {
-    console.error('API fetch failed:', err);
-    overlay.classList.add('hidden');
-
-    let banner = document.getElementById('errorBanner');
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'errorBanner';
-      banner.className = 'error-banner';
-      document.querySelector('.tabs').after(banner);
-    }
-    banner.textContent = 'Unable to load data. Retrying in 10 minutes... (' + err.message + ')';
-
-    // If we have existing data, keep showing it
-    if (currentCampaign) renderAll();
-  }
-}
-
-async function fetchPage(page) {
-  const url = `${API_BASE}/api/po/campaign/${API_CAMPAIGN}/orders` +
-    `?authKey=${API_AUTH}&page=${page}&pageSize=${API_PAGE_SIZE}` +
-    `&startDate=${API_START}&endDate=${API_END}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  if (json.statusCode !== 'Success') throw new Error(json.errorMessage || 'API error');
-  return json.body;
 }
 
 function expandRecords(recs) {
