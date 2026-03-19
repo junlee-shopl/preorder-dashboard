@@ -32,6 +32,8 @@ jobs:
 
       - name: Fetch latest data from Shopl API
         run: python fetch_data.py
+        env:
+          SHOPL_AUTH_KEY: ${{ secrets.SHOPL_AUTH_KEY }}
 
       - name: Commit data.json if changed
         run: |

@@ -5,12 +5,13 @@ Usage: python fetch_data.py
 
 import json
 import math
+import os
 import urllib.request
 from datetime import datetime, timezone
 
 # ── Config ──────────────────────────────────────────────────────────────────
 CAMPAIGN_ID  = "26b704cf-8b77-4c07-bbe3-c79bc8c9ba8c"
-AUTH_KEY     = "***REDACTED***"
+AUTH_KEY     = os.environ.get("SHOPL_AUTH_KEY", "")
 BASE_URL     = "https://dashboard.shoplworks.com"
 START_DATE   = "2026-02-26"
 END_DATE     = "2026-03-17"
@@ -75,6 +76,8 @@ def map_record(r: dict, batch_map: dict) -> dict:
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 def main():
+    if not AUTH_KEY:
+        raise EnvironmentError("SHOPL_AUTH_KEY environment variable is not set.")
     print("Fetching page 0 ...")
     first = fetch_page(0)
     total_elements = first["totalElements"]
